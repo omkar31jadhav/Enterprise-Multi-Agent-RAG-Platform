@@ -39,12 +39,10 @@ class FakeRetrievalService:
 
 class FakeGenerationService:
     def __init__(self) -> None:
-        self.seen_query: str | None = None
-        self.seen_context_count = 0
+        self.seen_prompt: str | None = None
 
-    def generate_answer(self, query: str, context_chunks) -> str:
-        self.seen_query = query
-        self.seen_context_count = len(context_chunks)
+    def generate_from_prompt(self, prompt: str) -> str:
+        self.seen_prompt = prompt
         return "answer"
 
 
@@ -86,6 +84,7 @@ def test_rag_service_orchestrates_retrieval_and_generation() -> None:
 
     answer = rag_service.answer_question("What is covered?")
 
-    assert answer == "answer"
-    assert generation_service.seen_query == "What is covered?"
-    assert generation_service.seen_context_count == 1
+    assert answer.startswith("answer")
+    assert "References:" in answer
+    assert generation_service.seen_prompt is not None
+    assert "What is covered?" in generation_service.seen_prompt

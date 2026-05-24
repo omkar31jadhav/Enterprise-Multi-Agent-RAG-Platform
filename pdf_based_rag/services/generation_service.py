@@ -48,6 +48,18 @@ class GenerationService:
         )
         return response.choices[0].message.content.strip()
 
+    def generate_from_prompt(self, prompt: str) -> str:
+        if not prompt.strip():
+            return "No indexed document content was found. Ingest documents before asking questions."
+
+        logger.info("Generating answer from assembled prompt with model=%s", self.model)
+        response = self._get_client().chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=self.temperature,
+        )
+        return response.choices[0].message.content.strip()
+
     def _get_client(self):
         if self._client is not None:
             return self._client
