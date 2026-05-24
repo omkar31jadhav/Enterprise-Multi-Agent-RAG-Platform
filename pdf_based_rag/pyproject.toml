@@ -21,6 +21,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0,<9",
+    "mypy>=1.9,<2",
+]
+mlflow = [
+    "mlflow>=2.5,<3",
 ]
 
 [tool.uv]
@@ -29,3 +33,16 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_return_any = true
+show_error_codes = true
+namespace_packages = true
+mypy_path = ["."]
+files = ["services", "rag", "vectorstores", "database", "ml", "config", "models"]

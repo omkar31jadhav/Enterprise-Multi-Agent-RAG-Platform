@@ -1,6 +1,10 @@
-from pathlib import Path
+from __future__ import annotations
 
-from models import RetrievedChunk
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
+
+from models import DocumentChunk, RetrievedChunk
 from services.ingestion_service import IngestionService
 from services.rag_service import RagService
 from services.retrieval_service import RetrievalService
@@ -9,20 +13,20 @@ from services.retrieval_service import RetrievalService
 class FakeVectorStore:
     def __init__(self) -> None:
         self.indexed_sources: list[str] = []
-        self.indexed_chunks = []
+        self.indexed_chunks: list[DocumentChunk] = []
 
-    def index_documents(self, chunks, source: str) -> int:
+    def index_documents(self, chunks: Iterable[str], source: str) -> int:
         chunk_list = list(chunks)
         self.indexed_sources.append(source)
         return len(chunk_list)
 
-    def index_chunks(self, chunks) -> int:
+    def index_chunks(self, chunks: Iterable[DocumentChunk]) -> int:
         chunk_list = list(chunks)
         self.indexed_chunks.extend(chunk_list)
         self.indexed_sources.extend(chunk.document_name for chunk in chunk_list)
         return len(chunk_list)
 
-    def similarity_search(self, query: str, k: int, filters=None):
+    def similarity_search(self, query: str, k: int, filters: Any = None) -> list[RetrievedChunk]:
         return [
             RetrievedChunk(
                 content=f"Context for {query}",
@@ -33,7 +37,12 @@ class FakeVectorStore:
 
 
 class FakeRetrievalService:
-    def retrieve(self, query: str, top_k=None, filters=None):
+    def retrieve(
+        self,
+        query: str,
+        top_k: int | None = None,
+        filters: Any = None,
+    ) -> list[RetrievedChunk]:
         return [RetrievedChunk(content=f"Retrieved: {query}", source="test.txt", score=0.8)]
 
 

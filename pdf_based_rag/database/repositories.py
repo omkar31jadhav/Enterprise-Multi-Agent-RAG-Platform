@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 import json
 import sqlite3
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from database.models import (
@@ -29,7 +29,7 @@ def to_json(data: dict[str, Any] | None) -> str:
 def from_json(value: str | None) -> dict[str, Any]:
     if not value:
         return {}
-    return json.loads(value)
+    return cast(dict[str, Any], json.loads(value))
 
 
 def to_iso(value: datetime) -> str:

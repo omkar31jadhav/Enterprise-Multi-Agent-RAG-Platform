@@ -26,10 +26,13 @@ class EmbeddingService:
 
     def embed_query(self, query: str) -> list[float]:
         vector = self.model.encode(query, show_progress_bar=False)
-        return np.asarray(vector, dtype=np.float32).tolist()
+        return [float(value) for value in np.asarray(vector, dtype=np.float32).tolist()]
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
             return []
         vectors = self.model.encode(list(texts), show_progress_bar=False)
-        return np.asarray(vectors, dtype=np.float32).tolist()
+        return [
+            [float(value) for value in np.asarray(vector, dtype=np.float32).tolist()]
+            for vector in vectors
+        ]

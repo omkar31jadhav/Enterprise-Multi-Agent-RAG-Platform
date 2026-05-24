@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 
 from chromadb import PersistentClient
 
@@ -15,6 +15,12 @@ from vectorstores.base import BaseVectorStore, CollectionStats, MetadataFilter
 
 
 logger = get_logger(__name__)
+
+
+class ChromaQueryResult(TypedDict, total=False):
+    documents: list[list[str]]
+    metadatas: list[list[dict[str, Any] | None]]
+    distances: list[list[float | int | None]]
 
 
 class ChromaVectorStore(BaseVectorStore):
@@ -135,7 +141,7 @@ class ChromaVectorStore(BaseVectorStore):
         if filters:
             query_kwargs["where"] = filters
 
-        result = self.collection.query(**query_kwargs)
+        result: ChromaQueryResult = self.collection.query(**query_kwargs)
         retrieved = self._result_to_chunks(result)
         deduped = self._deduplicate(retrieved)
         filtered = [chunk for chunk in deduped if chunk.score is None or chunk.score >= self.score_floor]
@@ -177,13 +183,15 @@ class ChromaVectorStore(BaseVectorStore):
     def _metadata_from_record(record: dict[str, Any]) -> dict[str, Any]:
         metadata = _flatten_metadata(record.get("metadata") or {})
         document_name = str(record.get("document_name") or record.get("source") or "unknown")
+        chunk_index_value = record.get("chunk_index")
+        page_number_value = record.get("page_number")
         metadata.update(
             {
                 "chunk_id": str(record.get("chunk_id") or ""),
                 "document_name": document_name,
                 "source": document_name,
-                "chunk_index": int(record.get("chunk_index") if record.get("chunk_index") is not None else -1),
-                "page_number": int(record.get("page_number") if record.get("page_number") is not None else -1),
+                "chunk_index": int(cast(str | float | int, chunk_index_value)) if chunk_index_value is not None else -1,
+                "page_number": int(cast(str | float | int, page_number_value)) if page_number_value is not None else -1,
                 "section_title": str(record.get("section_title") or ""),
                 "table_detected": bool(record.get("table_detected", False)),
                 "created_at": str(record.get("created_at") or ""),
@@ -218,7 +226,7 @@ class ChromaVectorStore(BaseVectorStore):
         return deduped
 
     @staticmethod
-    def _result_to_chunks(result: dict[str, Any]) -> list[RetrievedChunk]:
+    def _result_to_chunks(result: ChromaQueryResult) -> list[RetrievedChunk]:
         documents = (result.get("documents") or [[]])[0]
         metadatas = (result.get("metadatas") or [[]])[0]
         distances = (result.get("distances") or [[]])[0]

@@ -67,6 +67,9 @@ def test_rag_orchestrator_builds_conversational_prompt_and_formats_citations() -
     assert "Generated answer based on prompt." in result.answer
     assert "References:" in result.answer
     assert result.retrieved_chunks[0].chunk_id == "chunk-123"
+    assert result.metrics.prompt_version == "v1"
+    assert result.metrics.retrieval_scores == (0.87,)
+    assert result.metrics.context_size_estimate > 0
     assert result.metrics.prompt_assembly_time >= 0
     assert result.metrics.generation_time >= 0
     assert result.metrics.total_time >= 0

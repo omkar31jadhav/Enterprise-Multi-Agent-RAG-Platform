@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class PromptTemplate:
     name: str
     template: str
+    version: str = "v1"
     input_variables: tuple[str, ...] = ("context", "question")
 
     def format(self, **kwargs: str) -> str:
@@ -16,8 +17,9 @@ class PromptTemplate:
         return self.template.format(**kwargs)
 
 
-RETRIEVAL_QA_PROMPT = PromptTemplate(
+RETRIEVAL_QA_PROMPT_V1 = PromptTemplate(
     name="retrieval_qa",
+    version="v1",
     template="""You are an enterprise knowledge assistant.
 Use the information from the document context to answer the question accurately.
 Cite the source, page number, and section if available.
@@ -30,8 +32,11 @@ Question:
 {question}""",
 )
 
-CONVERSATIONAL_QA_PROMPT = PromptTemplate(
+RETRIEVAL_QA_PROMPT = RETRIEVAL_QA_PROMPT_V1
+
+CONVERSATIONAL_QA_PROMPT_V1 = PromptTemplate(
     name="conversational_qa",
+    version="v1",
     template="""You are an enterprise virtual assistant.
 Maintain the conversation tone and use only the provided context.
 If the answer is unknown, state that clearly.
@@ -47,8 +52,11 @@ Question:
     input_variables=("history", "context", "question"),
 )
 
-CITATION_AWARE_QA_PROMPT = PromptTemplate(
+CONVERSATIONAL_QA_PROMPT = CONVERSATIONAL_QA_PROMPT_V1
+
+CITATION_AWARE_QA_PROMPT_V1 = PromptTemplate(
     name="citation_aware_qa",
+    version="v1",
     template="""You are a compliance-focused assistant that provides citation-aware answers.
 Answer the question using the document context and include source references.
 List each reference on a separate line after the answer.
@@ -59,6 +67,8 @@ Context:
 Question:
 {question}""",
 )
+
+CITATION_AWARE_QA_PROMPT = CITATION_AWARE_QA_PROMPT_V1
 
 
 def format_prompt(template: PromptTemplate, **kwargs: str) -> str:

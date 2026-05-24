@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
+from ml.tracking import NoOpTrackingAdapter, TrackingAdapter
 from models import RetrievedChunk
 from rag.citations import CitationReference, extract_citation_references, format_citation_references
 from rag.memory import SQLConversationMemory
@@ -11,6 +12,7 @@ from rag.prompts import (
     CITATION_AWARE_QA_PROMPT,
     CONVERSATIONAL_QA_PROMPT,
     format_prompt,
+    PromptTemplate,
 )
 from utils import get_logger
 
@@ -27,6 +29,10 @@ class OrchestrationMetrics:
     retrieved_chunk_count: int
     citation_count: int
     prompt_name: str
+    prompt_version: str
+    prompt_template_used: str
+    retrieval_scores: tuple[float | None, ...]
+    context_size_estimate: int
 
 
 @dataclass(frozen=True)
@@ -50,8 +56,10 @@ class RagOrchestrator:
     def __init__(
         self,
         memory: SQLConversationMemory | None = None,
+        tracking_adapter: TrackingAdapter | None = None,
     ) -> None:
         self.memory = memory or SQLConversationMemory()
+        self.tracking_adapter = tracking_adapter or NoOpTrackingAdapter()
         self.name = "rag_orchestrator"
 
     def run(
@@ -74,9 +82,10 @@ class RagOrchestrator:
         history_truncated = self._truncate_history(history)
         memory_load_time = time.perf_counter() - start
 
-        prompt_name = self._prompt_name(history_truncated)
+        prompt_template = self._select_prompt_template(history_truncated)
         prompt_start = time.perf_counter()
         prompt = self._build_prompt(
+            prompt_template=prompt_template,
             query=query,
             history=history_truncated,
             retrieved_chunks=retrieved_chunks,
@@ -85,7 +94,7 @@ class RagOrchestrator:
 
         logger.info(
             "Orchestrator prompt assembled prompt_name=%s session_id=%s message_id=%s retrieved_chunks=%s history_count=%s",
-            prompt_name,
+            prompt_template.name,
             session_id,
             message_id,
             retrieved_chunk_count,
@@ -101,6 +110,9 @@ class RagOrchestrator:
         answer_with_citations = self._attach_citations(answer, references)
 
         total_time = time.perf_counter() - start
+        retrieval_scores = tuple(chunk.score for chunk in retrieved_chunks)
+        context = self._format_retrieved_context(retrieved_chunks)
+        context_size_estimate = len(context)
         metrics = OrchestrationMetrics(
             memory_load_time=memory_load_time,
             prompt_assembly_time=prompt_assembly_time,
@@ -109,8 +121,14 @@ class RagOrchestrator:
             history_count=history_count,
             retrieved_chunk_count=retrieved_chunk_count,
             citation_count=citation_count,
-            prompt_name=prompt_name,
+            prompt_name=prompt_template.name,
+            prompt_version=prompt_template.version,
+            prompt_template_used=prompt_template.name,
+            retrieval_scores=retrieval_scores,
+            context_size_estimate=context_size_estimate,
         )
+
+        self._log_tracking_metrics(prompt_template, metrics, session_id, message_id)
 
         logger.info(
             "Completed orchestration session_id=%s message_id=%s total_time=%.4f citations=%s",
@@ -128,6 +146,39 @@ class RagOrchestrator:
             metrics=metrics,
         )
 
+    def _log_tracking_metrics(
+        self,
+        prompt_template: PromptTemplate,
+        metrics: OrchestrationMetrics,
+        session_id: str | None,
+        message_id: str | None,
+    ) -> None:
+        self.tracking_adapter.log_params(
+            {
+                "orchestration_path": self.name,
+                "prompt_template_used": prompt_template.name,
+                "prompt_version": prompt_template.version,
+                "prompt_name": prompt_template.name,
+                "session_id": session_id or "none",
+                "message_id": message_id or "none",
+            }
+        )
+        self.tracking_adapter.log_metrics(
+            {
+                "memory_load_time": metrics.memory_load_time,
+                "prompt_assembly_time": metrics.prompt_assembly_time,
+                "generation_time": metrics.generation_time,
+                "orchestration_total_time": metrics.total_time,
+                "retrieved_chunk_count": metrics.retrieved_chunk_count,
+                "citation_count": metrics.citation_count,
+                "history_message_count": metrics.history_count,
+                "context_size_estimate": metrics.context_size_estimate,
+            }
+        )
+        self.tracking_adapter.log_params(
+            {"retrieval_scores": str(metrics.retrieval_scores)}
+        )
+
     def _load_history(self, session_id: str | None) -> str:
         if not session_id:
             return ""
@@ -139,6 +190,7 @@ class RagOrchestrator:
 
     def _build_prompt(
         self,
+        prompt_template: PromptTemplate,
         query: str,
         history: str,
         retrieved_chunks: list[RetrievedChunk],
@@ -149,14 +201,14 @@ class RagOrchestrator:
 
         if history:
             return format_prompt(
-                CONVERSATIONAL_QA_PROMPT,
+                prompt_template,
                 history=history,
                 context=context,
                 question=query,
             )
 
         return format_prompt(
-            CITATION_AWARE_QA_PROMPT,
+            prompt_template,
             context=context,
             question=query,
         )
@@ -232,6 +284,5 @@ class RagOrchestrator:
         citation_block = format_citation_references(references)
         return f"{answer}\n\nReferences:\n{citation_block}"
 
-    @staticmethod
-    def _prompt_name(history: str) -> str:
-        return "conversational_qa" if history else "citation_aware_qa"
+    def _select_prompt_template(self, history: str) -> PromptTemplate:
+        return CONVERSATIONAL_QA_PROMPT if history else CITATION_AWARE_QA_PROMPT

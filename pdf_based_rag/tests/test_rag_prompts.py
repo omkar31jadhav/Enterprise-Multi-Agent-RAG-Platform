@@ -1,4 +1,10 @@
-from rag.prompts import CITATION_AWARE_QA_PROMPT, CONVERSATIONAL_QA_PROMPT, RETRIEVAL_QA_PROMPT, format_prompt
+from rag.prompts import (
+    CITATION_AWARE_QA_PROMPT,
+    CONVERSATIONAL_QA_PROMPT,
+    RETRIEVAL_QA_PROMPT,
+    RETRIEVAL_QA_PROMPT_V1,
+    format_prompt,
+)
 
 
 def test_retrieval_qa_prompt_formats_context_and_question() -> None:
@@ -27,3 +33,10 @@ def test_citation_aware_prompt_contains_source_guidance() -> None:
     assert "citation-aware" in prompt.lower()
     assert "A short excerpt." in prompt
     assert "Give me a citation-aware answer." in prompt
+
+
+def test_prompt_templates_expose_version_information() -> None:
+    assert RETRIEVAL_QA_PROMPT.version == "v1"
+    assert CONVERSATIONAL_QA_PROMPT.version == "v1"
+    assert CITATION_AWARE_QA_PROMPT.version == "v1"
+    assert RETRIEVAL_QA_PROMPT is RETRIEVAL_QA_PROMPT_V1

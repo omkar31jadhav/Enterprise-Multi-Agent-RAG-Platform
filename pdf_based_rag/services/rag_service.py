@@ -4,6 +4,7 @@ import time
 
 from database.models import ChatMessageRecord
 from database.services import PersistenceService
+from ml.tracking import NoOpTrackingAdapter, TrackingAdapter
 from rag.orchestration import RagOrchestrator
 from services.generation_service import GenerationService
 from services.retrieval_service import RetrievalService
@@ -20,6 +21,7 @@ class RagService:
         generation_service: GenerationService | None = None,
         persistence_service: PersistenceService | None = None,
         orchestrator: RagOrchestrator | None = None,
+        tracking_adapter: TrackingAdapter | None = None,
     ) -> None:
         self.persistence_service = persistence_service
         if retrieval_service is None:
@@ -27,7 +29,8 @@ class RagService:
             retrieval_service = RetrievalService(persistence_service=self.persistence_service)
         self.retrieval_service = retrieval_service
         self.generation_service = generation_service or GenerationService()
-        self.orchestrator = orchestrator or RagOrchestrator()
+        self.tracking_adapter = tracking_adapter or NoOpTrackingAdapter()
+        self.orchestrator = orchestrator or RagOrchestrator(tracking_adapter=self.tracking_adapter)
 
     def answer_question(self, query: str) -> str:
         retrieval_start = time.perf_counter()
@@ -38,6 +41,14 @@ class RagService:
             len(retrieved_chunks),
             retrieval_time,
         )
+        self.tracking_adapter.log_metrics({"retrieval_time": retrieval_time})
+        self.tracking_adapter.log_params(
+            {
+                "query": query,
+                "execution_path": "answer_question",
+                "session_id": "none",
+            }
+        )
 
         orchestration_result = self.orchestrator.run(
             query=query,
@@ -45,6 +56,24 @@ class RagService:
             session_id=None,
             message_id=None,
             generation_function=self._generate_from_prompt,
+        )
+        self.tracking_adapter.log_params(
+            {
+                "prompt_name": orchestration_result.metrics.prompt_name,
+                "prompt_version": orchestration_result.metrics.prompt_version,
+                "prompt_template_used": orchestration_result.metrics.prompt_template_used,
+                "orchestration_path": "answer_question",
+            }
+        )
+        self.tracking_adapter.log_metrics(
+            {
+                "generation_time": orchestration_result.metrics.generation_time,
+                "orchestration_total_time": orchestration_result.metrics.total_time,
+                "retrieved_chunk_count": orchestration_result.metrics.retrieved_chunk_count,
+                "citation_count": orchestration_result.metrics.citation_count,
+                "history_message_count": orchestration_result.metrics.history_count,
+                "context_size_estimate": orchestration_result.metrics.context_size_estimate,
+            }
         )
         logger.info(
             "Orchestration completed for query=%s prompt_name=%s citations=%s prompt_time=%.4f generation_time=%.4f total_time=%.4f",
@@ -82,6 +111,15 @@ class RagService:
             retrieval_time,
             session_id,
         )
+        self.tracking_adapter.log_metrics({"retrieval_time": retrieval_time})
+        self.tracking_adapter.log_params(
+            {
+                "query": query,
+                "execution_path": "answer_chat",
+                "session_id": session_id,
+                "message_id": user_message.message_id,
+            }
+        )
 
         orchestration_result = self.orchestrator.run(
             query=query,
@@ -92,6 +130,24 @@ class RagService:
         )
 
         answer = orchestration_result.answer
+        self.tracking_adapter.log_params(
+            {
+                "prompt_name": orchestration_result.metrics.prompt_name,
+                "prompt_version": orchestration_result.metrics.prompt_version,
+                "prompt_template_used": orchestration_result.metrics.prompt_template_used,
+                "orchestration_path": "answer_chat",
+            }
+        )
+        self.tracking_adapter.log_metrics(
+            {
+                "generation_time": orchestration_result.metrics.generation_time,
+                "orchestration_total_time": orchestration_result.metrics.total_time,
+                "retrieved_chunk_count": orchestration_result.metrics.retrieved_chunk_count,
+                "citation_count": orchestration_result.metrics.citation_count,
+                "history_message_count": orchestration_result.metrics.history_count,
+                "context_size_estimate": orchestration_result.metrics.context_size_estimate,
+            }
+        )
         assistant_message = self.persistence_service.add_message(
             session_id=session_id,
             role="assistant",

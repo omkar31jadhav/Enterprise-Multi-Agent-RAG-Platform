@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
 from models import RetrievedChunk
 from services.retrieval_service import RetrievalService
@@ -51,7 +51,7 @@ class LangChainRetrieverAdapter:
     def get_relevant_chunks(self, query: str) -> list[RetrievedChunk]:
         return self.retrieve(query)
 
-    def get_relevant_documents_with_metadata(self, query: str) -> list[dict[str, str | int | float | bool | None]]:
+    def get_relevant_documents_with_metadata(self, query: str) -> list[dict[str, Any]]:
         retrieved = self.retrieve(query)
         return [
             {

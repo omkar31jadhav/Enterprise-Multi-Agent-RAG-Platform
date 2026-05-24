@@ -29,6 +29,9 @@ class AppSettings:
     top_k: int
     retrieval_score_floor: float
     log_level: str
+    mlflow_tracking_uri: str | None
+    mlflow_experiment_name: str
+    mlflow_enabled: bool
 
 
 def _path_from_env(name: str, default: Path) -> Path:
@@ -59,6 +62,9 @@ def get_settings() -> AppSettings:
         top_k=int(os.getenv("TOP_K", "3")),
         retrieval_score_floor=float(os.getenv("RETRIEVAL_SCORE_FLOOR", "0.0")),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
+        mlflow_tracking_uri=os.getenv("MLFLOW_TRACKING_URI"),
+        mlflow_experiment_name=os.getenv("MLFLOW_EXPERIMENT_NAME", "pdf_based_rag"),
+        mlflow_enabled=os.getenv("MLFLOW_ENABLED", "false").lower() in {"1", "true", "yes", "y"},
     )
 
 
@@ -88,3 +94,6 @@ class Config:
     TOP_K = _settings.top_k
     RETRIEVAL_SCORE_FLOOR = _settings.retrieval_score_floor
     LOG_LEVEL = _settings.log_level
+    MLFLOW_TRACKING_URI = _settings.mlflow_tracking_uri
+    MLFLOW_EXPERIMENT_NAME = _settings.mlflow_experiment_name
+    MLFLOW_ENABLED = _settings.mlflow_enabled
