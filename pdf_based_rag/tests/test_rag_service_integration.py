@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from database.connection import Database
 from database.models import ChatMessageRecord
@@ -109,6 +110,27 @@ class CapturingOrchestrator:
         return self.last_result
 
 
+class CapturingTrackingAdapter:
+    def __init__(self) -> None:
+        self.params: dict[str, Any] = {}
+        self.metrics: dict[str, float | int] = {}
+
+    def start_run(self, config=None) -> None:
+        pass
+
+    def log_params(self, params: dict[str, Any]) -> None:
+        self.params.update(params)
+
+    def log_metrics(self, metrics: dict[str, float | int]) -> None:
+        self.metrics.update(metrics)
+
+    def set_tags(self, tags: dict[str, str]) -> None:
+        pass
+
+    def end_run(self) -> None:
+        pass
+
+
 def test_rag_service_answer_question_uses_orchestrator_and_returns_citation_references() -> None:
     chunks = [
         RetrievedChunk(
@@ -138,6 +160,112 @@ def test_rag_service_answer_question_uses_orchestrator_and_returns_citation_refe
     assert generation_service.last_prompt is not None
     assert "Introduction" in generation_service.last_prompt
     assert "What is the summary?" in generation_service.last_prompt
+
+
+def test_rag_service_answer_question_with_workflow_tracks_execution_and_returns_answer() -> None:
+    chunks = [
+        RetrievedChunk(
+            content="Workflow context.",
+            source="doc.pdf",
+            score=0.85,
+            page_number=1,
+            section_title="Workflow",
+            chunk_id="workflow-1",
+        )
+    ]
+    retrieval_service = FakeRetrievalService(chunks=chunks)
+    generation_service = FakeGenerationService()
+    tracking_adapter = CapturingTrackingAdapter()
+    persistence = FakePersistenceService()
+    service = RagService(
+        retrieval_service=retrieval_service,
+        generation_service=generation_service,
+        persistence_service=persistence,
+        tracking_adapter=tracking_adapter,
+    )
+
+    answer = service.answer_question_with_workflow("Summarize the workflow.")
+
+    assert answer.startswith("Generated answer.")
+    assert tracking_adapter.params["workflow_path"] == "answer_question_with_workflow"
+    assert "workflow_execution_id" in tracking_adapter.params
+    assert tracking_adapter.metrics["workflow_duration"] >= 0
+    assert "workflow_node_retrieval_duration" in tracking_adapter.metrics
+    assert "workflow_node_generation_duration" in tracking_adapter.metrics
+    assert generation_service.last_prompt is not None
+    assert "Summarize the workflow." in generation_service.last_prompt
+
+
+def test_rag_service_answer_chat_with_workflow_persists_messages_and_metadata() -> None:
+    chunks = [
+        RetrievedChunk(
+            content="Conversation context.",
+            source="chat.pdf",
+            score=0.9,
+            page_number=3,
+            section_title="Chat",
+            chunk_id="chat-1",
+        )
+    ]
+    persistence = FakePersistenceService()
+    retrieval_service = FakeRetrievalService(chunks=chunks)
+    generation_service = FakeGenerationService()
+    tracking_adapter = CapturingTrackingAdapter()
+    service = RagService(
+        retrieval_service=retrieval_service,
+        generation_service=generation_service,
+        persistence_service=persistence,
+        tracking_adapter=tracking_adapter,
+    )
+
+    answer, user_message, assistant_message = service.answer_chat_with_workflow(
+        "How does workflow work?",
+        session_id="session-workflow",
+    )
+
+    assert answer.startswith("Generated answer.")
+    assert user_message.role == "user"
+    assert assistant_message.role == "assistant"
+    assert assistant_message.metadata["retrieved_chunk_ids"] == ["chat-1"]
+    assert tracking_adapter.params["workflow_path"] == "answer_chat_with_workflow"
+    assert tracking_adapter.metrics["workflow_duration"] >= 0
+
+
+def test_rag_service_answer_chat_with_workflow_falls_back_on_generation_error() -> None:
+    class FailingGenerationService:
+        def generate_from_prompt(self, prompt: str) -> str:
+            raise RuntimeError("generation failed")
+
+    chunks = [
+        RetrievedChunk(
+            content="Context for failure.",
+            source="doc.pdf",
+            score=0.75,
+            page_number=2,
+            section_title="Failure",
+            chunk_id="fail-1",
+        )
+    ]
+    persistence = FakePersistenceService()
+    retrieval_service = FakeRetrievalService(chunks=chunks)
+    generation_service = FailingGenerationService()
+    tracking_adapter = CapturingTrackingAdapter()
+    service = RagService(
+        retrieval_service=retrieval_service,
+        generation_service=generation_service,
+        persistence_service=persistence,
+        tracking_adapter=tracking_adapter,
+    )
+
+    answer, user_message, assistant_message = service.answer_chat_with_workflow(
+        "Will this fail?",
+        session_id="session-fallback",
+    )
+
+    assert "could not complete" in answer
+    assert assistant_message.content == answer
+    assert tracking_adapter.params["workflow_path"] == "answer_chat_with_workflow"
+    assert tracking_adapter.metrics["workflow_failure_count"] == 1
 
 
 def test_rag_service_answer_chat_uses_memory_and_persists_assistant_message() -> None:

@@ -45,4 +45,4 @@ warn_return_any = true
 show_error_codes = true
 namespace_packages = true
 mypy_path = ["."]
-files = ["services", "rag", "vectorstores", "database", "ml", "config", "models"]
+files = ["services", "rag", "vectorstores", "database", "ml", "config", "models", "workflow"]

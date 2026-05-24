@@ -88,8 +88,8 @@ class ChromaVectorStore(BaseVectorStore):
         self.collection.upsert(
             ids=ids,
             documents=documents,
-            metadatas=metadatas,
-            embeddings=embeddings,
+            metadatas=cast(Any, metadatas),
+            embeddings=cast(Any, embeddings),
         )
         logger.info(
             "Indexed chunks into Chroma collection=%s count=%s total=%s",
@@ -112,8 +112,8 @@ class ChromaVectorStore(BaseVectorStore):
         self.collection.upsert(
             ids=ids,
             documents=documents,
-            metadatas=metadatas,
-            embeddings=embeddings,
+            metadatas=cast(Any, metadatas),
+            embeddings=cast(Any, embeddings),
         )
         logger.info(
             "Migrated pre-embedded records into Chroma collection=%s count=%s total=%s",
@@ -141,7 +141,7 @@ class ChromaVectorStore(BaseVectorStore):
         if filters:
             query_kwargs["where"] = filters
 
-        result: ChromaQueryResult = self.collection.query(**query_kwargs)
+        result = cast(ChromaQueryResult, self.collection.query(**query_kwargs))
         retrieved = self._result_to_chunks(result)
         deduped = self._deduplicate(retrieved)
         filtered = [chunk for chunk in deduped if chunk.score is None or chunk.score >= self.score_floor]
