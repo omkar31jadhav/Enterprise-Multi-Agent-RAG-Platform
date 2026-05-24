@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.pytest_tmp/
+.pytest_*/
+
+# Virtual environments
+.venv/
+venv/
+
+# Local environment
+.env
+
+# Build artifacts
+build/
+dist/
+
+# App data
+data/
+!data/.gitkeep
