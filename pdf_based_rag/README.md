@@ -140,15 +140,19 @@ The platform supports runtime flags for workflow control.
 |---|---|---|
 | `WORKFLOW_ENABLED` | Enable workflow graph execution | `false` |
 | `WORKFLOW_FALLBACK_ENABLED` | Fall back to classic orchestration on workflow failure | `true` |
+| `WORKFLOW_OBSERVABILITY_ENABLED` | Workflow observability hooks | `true` |
 | `WORKFLOW_EVALUATION_ENABLED` | Enable or disable workflow evaluation node | `true` |
 
 ```env
 WORKFLOW_ENABLED=true
 WORKFLOW_FALLBACK_ENABLED=true
+WORKFLOW_OBSERVABILITY_ENABLED=true
 WORKFLOW_EVALUATION_ENABLED=true
 ```
 
 If `use_workflow` is provided to public service calls, it overrides the config default for that request.
+
+`app.py` and `main.py` load `WorkflowConfig.from_env()`. With `.env.example` defaults, the **classic orchestration path** remains active.
 
 ---
 
@@ -223,27 +227,65 @@ make run
 
 ## Environment Variables
 
-```env
-GROQ_API_KEY=your_groq_api_key
-LLM_MODEL=llama-3.3-70b-versatile
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-DOCUMENTS_DIR=documents
-DATA_DIR=data
-DATABASE_URL=sqlite:///data/rag_platform.db
-SQLITE_PATH=data/rag_platform.db
-VECTOR_BACKEND=chroma
-CHROMA_PERSIST_DIR=data/chroma
-CHROMA_COLLECTION_NAME=enterprise_rag_documents
-AUTO_MIGRATE_LEGACY_VECTORS=true
-CHUNK_SIZE=512
-CHUNK_OVERLAP=100
-TOP_K=3
-RETRIEVAL_SCORE_FLOOR=0.0
-LOG_LEVEL=INFO
-WORKFLOW_ENABLED=false
-WORKFLOW_FALLBACK_ENABLED=true
-WORKFLOW_EVALUATION_ENABLED=true
+Copy `.env.example` to `.env` and set secrets locally. Never commit `.env`.
+
+| Category | Variables |
+|----------|-----------|
+| **Required for Q&A** | `GROQ_API_KEY` |
+| **Models** | `LLM_MODEL`, `EMBEDDING_MODEL` |
+| **Storage** | `DATA_DIR`, `SQLITE_PATH`, `CHROMA_PERSIST_DIR`, `DOCUMENTS_DIR` |
+| **Workflow** | `WORKFLOW_ENABLED`, `WORKFLOW_FALLBACK_ENABLED`, `WORKFLOW_OBSERVABILITY_ENABLED`, `WORKFLOW_EVALUATION_ENABLED` |
+| **Observability (optional)** | `MLFLOW_ENABLED`, `MLFLOW_TRACKING_URI`, `MLFLOW_EXPERIMENT_NAME` |
+
+Full annotated sample: [`.env.example`](.env.example). Deeper reference: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+---
+
+## CI/CD
+
+GitHub Actions runs at the **repository root** (monorepo) when `pdf_based_rag/` changes:
+
+| Step | Command |
+|------|---------|
+| Tests | `python -m pytest tests/ -v` |
+| Types | `python -m mypy` |
+| Compile | `python -m compileall -q -x "\.venv" .` |
+
+Workflow file: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (Python 3.11, Ubuntu).
+
+---
+
+## Deployment & Docker
+
+### Health check
+
+```powershell
+python scripts/healthcheck.py
 ```
+
+Verifies imports and a writable `DATA_DIR`. Warns if `GROQ_API_KEY` is unset. Does not call external APIs.
+
+### Docker (Streamlit UI)
+
+```powershell
+Copy-Item .env.example .env
+# Set GROQ_API_KEY in .env
+
+docker compose up --build
+```
+
+Open http://localhost:8501. Persistent state is stored in the `rag_data` volume (`DATA_DIR`).
+
+### Startup summary
+
+1. Configure `.env` from `.env.example`.
+2. Add documents under `documents/` or upload via Streamlit.
+3. Run `streamlit run app.py` or `docker compose up`.
+4. Optional CLI: `python main.py`.
+
+Production notes, volume layout, and workflow rollout guidance: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+Developer onboarding: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ---
 
@@ -277,8 +319,12 @@ pdf_based_rag/
 ├── workflow/                 # optional workflow graph and nodes
 ├── tests/                    # regression and integration tests
 ├── config/                   # runtime configuration and workflow flags
+├── docs/                     # deployment and developer guides
+├── scripts/                  # operational scripts (healthcheck)
 ├── utils/                    # logging helpers and utilities
-└── .env.example              # sample runtime configuration
+├── Dockerfile                # container image for Streamlit UI
+├── docker-compose.yml        # local/production-style compose stack
+└── .env.example              # sample runtime configuration (no secrets)
 ```
 
 ---

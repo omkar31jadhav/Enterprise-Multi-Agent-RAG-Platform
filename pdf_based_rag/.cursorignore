@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+mypy_cache/
+mlruns/
+chroma_db/
+*.db
+*.sqlite3
+*.pkl
+*.bin
+*.pt
+*.onnx
+node_modules/

@@ -1,7 +1,7 @@
 PYTHON=.venv\Scripts\python.exe
 PIP=.venv\Scripts\pip.exe
 
-.PHONY: setup test mypy lint run clean
+.PHONY: setup test mypy lint run pycompile healthcheck docker-build docker-up clean
 
 setup:
 	python -m venv .venv
@@ -16,7 +16,7 @@ test:
 	$(PYTHON) -m pytest tests/ -v
 
 mypy:
-	$(PYTHON) -m mypy .
+	$(PYTHON) -m mypy
 
 lint:
 	@echo "No explicit linter configured. Run mypy or pytest for validation."
@@ -26,6 +26,15 @@ run:
 
 pycompile:
 	$(PYTHON) -m compileall -q -x ".venv" .
+
+healthcheck:
+	$(PYTHON) scripts/healthcheck.py
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up --build
 
 clean:
 	rmdir /s /q .venv

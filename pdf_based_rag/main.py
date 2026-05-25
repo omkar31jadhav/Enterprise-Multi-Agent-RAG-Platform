@@ -1,4 +1,5 @@
 from config import Config
+from config.workflow import WorkflowConfig
 from database.services import PersistenceService
 from ingest import ingest_documents
 from services.rag_service import RagService
@@ -15,7 +16,10 @@ print(
 
 persistence_service = PersistenceService()
 chat_session = persistence_service.create_chat_session(user_identifier="cli")
-rag_service = RagService(persistence_service=persistence_service)
+rag_service = RagService(
+    persistence_service=persistence_service,
+    workflow_config=WorkflowConfig.from_env(),
+)
 print(f"\nChat session: {chat_session.session_id}")
 
 while True:

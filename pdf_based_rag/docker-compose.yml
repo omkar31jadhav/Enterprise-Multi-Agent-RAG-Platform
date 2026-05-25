@@ -1,0 +1,29 @@
+services:
+  rag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pdf-based-rag:latest
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+      DOCUMENTS_DIR: /app/documents
+      CHROMA_PERSIST_DIR: /app/data/chroma
+      SQLITE_PATH: /app/data/rag_platform.db
+      DATABASE_URL: sqlite:////app/data/rag_platform.db
+    volumes:
+      - rag_data:/app/data
+      - ./documents:/app/documents
+    healthcheck:
+      test: ["CMD", "python", "scripts/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+volumes:
+  rag_data:

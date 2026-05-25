@@ -4,6 +4,7 @@ import tempfile
 import streamlit as st
 
 from config import Config
+from config.workflow import WorkflowConfig
 from database.services import PersistenceService
 from services.generation_service import GenerationService
 from services.ingestion_service import IngestionService
@@ -35,6 +36,7 @@ rag_service = RagService(
     retrieval_service=retrieval_service,
     generation_service=generation_service,
     persistence_service=persistence_service,
+    workflow_config=WorkflowConfig.from_env(),
 )
 vector_stats = vector_store.collection_stats()
 
